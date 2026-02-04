@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>rncy/dev</title>
+
+<style>
+:root{
+--bg:#04060a;
+--text:#d1d5db;
+--muted:#6b7280;
+--accent:#89b4c8;
+--active:#6ee7b7;
+}
+
+*{box-sizing:border-box}
+
+body{
+margin:0;
+font-family:JetBrains Mono, monospace;
+background:var(--bg);
+color:var(--text);
+overflow:hidden;
+}
+
+/* scanline */
+body::after{
+content:"";
+position:fixed;
+inset:0;
+pointer-events:none;
+background:repeating-linear-gradient(
+to bottom,
+transparent,
+transparent 3px,
+rgba(255,255,255,.015) 4px
+);
+mix-blend-mode:overlay;
+z-index:2;
+}
+
+/* rain */
+#rain{
+position:fixed;
+inset:0;
+z-index:0;
+opacity:.14;
+}
+
+/* layout */
+#hero{
+position:relative;
+z-index:3;
+height:100vh;
+display:flex;
+flex-direction:column;
+align-items:center;
+justify-content:center;
+gap:16px;
+}
+
+/* title */
+#title{
+font-size:2.2rem;
+font-weight:600;
+letter-spacing:.16em;
+color:var(--accent);
+user-select:none;
+text-shadow:0 0 12px rgba(137,180,200,.18);
+transition:opacity .3s ease;
+}
+
+#title.pressed{
+transform:translateY(1px);
+opacity:.9;
+}
+
+/* status */
+#status{
+font-size:.7rem;
+letter-spacing:.12em;
+color:var(--muted);
+display:flex;
+align-items:center;
+gap:6px;
+}
+
+.dot{
+width:7px;
+height:7px;
+border-radius:50%;
+background:var(--active);
+box-shadow:0 0 6px rgba(110,231,183,.6);
+}
+
+/* terminal */
+#terminal{
+font-size:.85rem;
+color:var(--muted);
+white-space:pre-line;
+min-height:9em;
+max-width:420px;
+line-height:1.6;
+}
+
+/* input */
+#input-line{
+display:flex;
+gap:6px;
+font-size:.85rem;
+opacity:.85;
+}
+
+#input{
+background:none;
+border:none;
+outline:none;
+color:var(--text);
+font-family:inherit;
+width:200px;
+}
+
+.cursor{
+width:6px;
+height:1em;
+background:var(--text);
+opacity:.6;
+animation:blink 1.8s steps(1) infinite;
+}
+
+@keyframes blink{
+45%{opacity:0}
+}
+
+/* residue */
+.mark{
+position:fixed;
+font-size:2.2rem;
+font-family:JetBrains Mono, monospace;
+font-weight:600;
+letter-spacing:.16em;
+color:rgba(137,180,200,.25);
+pointer-events:none;
+mix-blend-mode:screen;
+animation:decay 3.2s linear forwards;
+z-index:1;
+}
+
+@keyframes decay{
+0%{opacity:.55}
+60%{opacity:.25}
+100%{opacity:0}
+}
+
+/* contact */
+#contact{
+position:fixed;
+bottom:18px;
+left:50%;
+transform:translateX(-50%);
+z-index:3;
+font-size:.7rem;
+letter-spacing:.12em;
+color:#4b5563;
+opacity:.65;
+display:flex;
+gap:18px;
+}
+
+#contact a{
+color:inherit;
+text-decoration:none;
+transition:opacity .2s ease;
+}
+
+#contact a:hover{opacity:1}
+</style>
+</head>
+
+<body>
+
+<canvas id="rain"></canvas>
+
+<section id="hero">
+<div id="title">&gt;.rncy/dev</div>
+
+<div id="status">
+<div class="dot"></div>
+<span id="clock">active — -- · --:-- WIB</span>
+</div>
+
+<div id="terminal">type `help`</div>
+
+<div id="input-line">
+<span>&gt;</span>
+<input id="input" autocomplete="off">
+<div class="cursor"></div>
+</div>
+</section>
+
+<div id="contact">
+<a href="https://github.com/rncydev" target="_blank">github</a>
+<a href="https://instagram.com/0xrncy" target="_blank">ig</a>
+<a href="mailto:0xrncy@gmail.com">mail</a>
+</div>
+
+<script>
+/* ===== WIB CLOCK + DATE ===== */
+function updateWIB(){
+const now = new Date();
+const wib = new Date(now.toLocaleString("en-US",{timeZone:"Asia/Jakarta"}));
+const date = wib.toLocaleDateString("id-ID",{day:'2-digit',month:'short',year:'numeric'});
+const time = wib.toLocaleTimeString("id-ID",{hour:'2-digit',minute:'2-digit'});
+document.getElementById("clock").textContent =
+`active — ${date} · ${time} WIB`;
+}
+setInterval(updateWIB,1000);
+updateWIB();
+
+/* ===== RAIN (SMOOTHER FALL) ===== */
+const c = document.getElementById("rain");
+const ctx = c.getContext("2d");
+
+let w,h,cols,drops,vel;
+
+function resize(){
+w = c.width = innerWidth;
+h = c.height = innerHeight;
+cols = Math.floor(w / 22);
+drops = Array(cols).fill(0);
+vel   = Array(cols).fill(0).map(()=>0.3+Math.random()*0.6);
+}
+resize();
+addEventListener("resize", resize);
+
+function rain(){
+ctx.fillStyle = "rgba(4,6,10,0.08)";
+ctx.fillRect(0,0,w,h);
+
+ctx.fillStyle = "rgba(137,180,200,.4)";
+ctx.font = "11px JetBrains Mono";
+
+for(let i=0;i<cols;i++){
+drops[i]+=vel[i];
+const y = Math.floor(drops[i])*18;
+if(Math.random()>.985){
+ctx.fillText(Math.random()>.5?"0":"1", i*22, y);
+}
+if(y>h){
+drops[i]=0;
+vel[i]=0.3+Math.random()*0.6;
+}
+}
+requestAnimationFrame(rain);
+}
+rain();
+
+/* ===== TERMINAL ===== */
+const title=document.getElementById("title");
+const term=document.getElementById("terminal");
+const input=document.getElementById("input");
+
+const files={
+"about.txt":"between intent and execution.\nstill refining.",
+"profile.conf":"user=rncy\nrole=developer\nshell=/bin/quiet"
+};
+
+function outSlow(text){
+const lines=text.split("\n");
+let i=0;
+(function next(){
+if(i<lines.length){
+term.textContent+="\n"+lines[i++];
+setTimeout(next,35+Math.random()*40);
+}
+})();
+}
+
+title.addEventListener("pointerdown",()=>{
+title.classList.add("pressed");
+const r=title.getBoundingClientRect();
+const m=document.createElement("div");
+m.className="mark";
+m.textContent=">.rncy/dev";
+m.style.left=(r.left+Math.random()*8-4)+"px";
+m.style.top=(r.top+Math.random()*6)+"px";
+document.body.appendChild(m);
+setTimeout(()=>m.remove(),3200);
+});
+addEventListener("pointerup",()=>title.classList.remove("pressed"));
+
+input.addEventListener("keydown",e=>{
+if(e.key!=="Enter")return;
+const cmd=input.value.trim();
+input.value="";
+term.textContent+="\n> "+cmd;
+const p=cmd.split(" ");
+
+switch(p[0]){
+case "help": outSlow("help | whoami | ls | cat <file> | pwd | date | clear"); break;
+case "whoami": outSlow("rncy\nuid=1000(dev)\nshell=/bin/quiet"); break;
+case "ls": outSlow(Object.keys(files).join("  ")); break;
+case "cat": files[p[1]]?outSlow(files[p[1]]):outSlow("file not found"); break;
+case "pwd": outSlow("/home/rncy"); break;
+case "date": outSlow(new Date().toLocaleString("id-ID",{timeZone:"Asia/Jakarta"})+" WIB"); break;
+case "clear": term.textContent=""; break;
+default: outSlow("command not found");
+}
+});
+
+input.focus();
+</script>
+
+</body>
+</html>
